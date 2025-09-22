@@ -1,3 +1,4 @@
 flask==3.0.2
 pytrends==4.9.2
 praw==7.7.1
+gunicorn==21.2.0
