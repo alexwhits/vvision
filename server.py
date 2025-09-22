@@ -6,6 +6,11 @@ import os
 
 app = Flask(__name__)
 
+@app.after_request
+def add_cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
 # ---- helpers -------------------------------------------------
 def normalize_score(items, key="score"):
     vals = [i.get(key, 0) for i in items if i.get(key, 0) > 0]
