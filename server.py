@@ -36,9 +36,9 @@ def fetch_trends(region="united_states", limit=10):
 def fetch_reddit(limit=10):
     try:
         reddit = praw.Reddit(
-            client_id=os.environ.get("REDDIT_CLIENT_ID"),
-            client_secret=os.environ.get("REDDIT_CLIENT_SECRET"),
-            user_agent="vvision/0.1 by u/yourusername"
+            client_id=os.environ.get("aEIquN5Wu3UNbXmiZCaBGg"),
+            client_secret=os.environ.get("CKuhDTcGVEUJrILD8KTZb0CYEgUzgA"),
+            user_agent="vvision/0.1 by u/nonlethaljazz"
         )
         posts = []
         for p in reddit.subreddit("all").hot(limit=limit):
