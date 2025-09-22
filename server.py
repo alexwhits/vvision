@@ -1,10 +1,12 @@
 import time
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from pytrends.request import TrendReq
 import praw
 import os
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})  # allow cross-site fetches
 
 @app.after_request
 def add_cors(resp):
@@ -54,21 +56,27 @@ def fetch_reddit(limit=10):
         return []
 
 # ---- endpoint ------------------------------------------------
-@app.route("/api/attention/heatmap")
+@app.route("/api/attention/heatmap", methods=["GET","OPTIONS"])
 def heatmap():
+    if request.method == "OPTIONS":
+        return ("", 204)
     trends = fetch_trends(limit=10)
     reddit = fetch_reddit(limit=10)
     items = trends + reddit
+    if not items:
+        items = [
+            {"title":"sample item one", "url": None, "source":"demo", "score": 1.0},
+            {"title":"sample item two", "url": None, "source":"demo", "score": 0.7},
+        ]
     items = normalize_score(items, key="score")
-    return jsonify({
-        "last_updated": int(time.time()),
-        "items": items
-    })
+    return jsonify({"last_updated": int(time.time()), "items": items})
+
 
 @app.get("/")
 def root():
     return jsonify({"ok": True, "endpoints": ["/api/attention/heatmap"]})
 
 if __name__ == "__main__":
-    # for local testing
-    app.run(host="0.0.0.0", port=5000)
+       import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
