@@ -1,3 +1,7 @@
+import re
+import feedparser
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from difflib import SequenceMatcher
 import os
 import time
 import datetime as dt
@@ -29,6 +33,34 @@ def normalize_score(items, key="score"):
     for it in items:
         it[key] = round(float(it.get(key, 0)) / m, 3)
     return items
+    ANALYZER = SentimentIntensityAnalyzer()
+
+# light normalize → a rough “topic key”
+_STOP = set("""
+a an the of for & and to in on with from about by at is are was were be been being
+""".split())
+
+def normalize_topic(text: str) -> str:
+    t = (text or "").lower()
+    t = re.sub(r"[^a-z0-9\s]", " ", t)         # drop punct
+    toks = [w for w in t.split() if w not in _STOP and len(w) > 2]
+    return " ".join(toks)[:80].strip()
+
+def similar(a: str, b: str, thresh=0.88) -> bool:
+    # cheap fuzzy—good enough for headlines
+    return SequenceMatcher(None, a, b).ratio() >= thresh
+
+def sentiment_delta(title: str) -> float:
+    # map VADER compound (-1..1) to delta where sign drives color
+    s = ANALYZER.polarity_scores(title or "")
+    c = s.get("compound", 0.0)
+    return float(c)  # positive => green, negative => red
+
+def normalize_01(values):
+    if not values: return []
+    m = max(values) or 1.0
+    return [v / m for v in values]
+
 
 # ---- data sources ---------------------------------------------------
 
@@ -130,26 +162,85 @@ def heatmap():
     if request.method == "OPTIONS":
         return ("", 204)
 
-    trends = fetch_trends(limit=12)
-    reddit = fetch_reddit(limit=12)
+    # 1) pull raw signals
+    trends = fetch_trends(limit=15)
+    reddit = fetch_reddit(limit=20)
+    news   = fetch_reuters(limit=20)
 
-    # seed X from combined titles (or replace with your own watchlist)
-    seed_terms = [it["title"] for it in (trends + reddit)][:8]
+    # seed X from top terms out of trends+news to avoid noisy reddit phrasing
+    seed_terms = [it["title"] for it in (trends + news)][:10]
     x_items = fetch_x_counts(seed_terms, granularity="minute")
 
-    items = trends + reddit + x_items
-    if not items:
-        items = [
-            {"title": "sample one", "source": "demo", "score": 1.0, "d1": 0.1},
-            {"title": "sample two", "source": "demo", "score": 0.7, "d1": -0.1},
-        ]
+    raw = trends + reddit + news + x_items
 
+    # 2) group by topic key + light fuzzy merge
+    buckets = []   # list of dicts {key, titles, urls, sources, mentions, sum_score, best_title}
+    for it in raw:
+        title = (it.get("title") or "").strip()
+        if not title: 
+            continue
+        key = normalize_topic(title)
+        if not key: 
+            continue
+
+        # find existing bucket by exact key or fuzzy
+        found = None
+        for b in buckets:
+            if b["key"] == key or similar(b["key"], key):
+                found = b; break
+        if not found:
+            found = {"key": key, "titles": [], "urls": [], "sources": set(),
+                     "mentions": 0, "sum_score": 0.0, "best_title": title}
+            buckets.append(found)
+
+        found["titles"].append(title)
+        url = it.get("url")
+        if url: found["urls"].append(url)
+        found["sources"].add(it.get("source") or "")
+        found["mentions"] += 1
+        found["sum_score"] += float(it.get("score", 1.0))
+        # prefer shortest clean title as display
+        if len(title) < len(found["best_title"]):
+            found["best_title"] = title
+
+    if not buckets:
+        demo = [
+            {"title": "placeholder topic A", "url": None, "source":"demo", "score":1.0, "d1": 0.25},
+            {"title": "placeholder topic B", "url": None, "source":"demo", "score":0.6, "d1": -0.2},
+        ]
+        return jsonify({"last_updated": int(time.time()), "items": demo})
+
+    # 3) compute popularity score (mentions-weighted)
+    #    score drives SIZE/opacity; d1 drives COLOR via sentiment
+    max_mentions = max(b["mentions"] for b in buckets) or 1
+    items = []
+    for b in buckets:
+        display = b["best_title"]
+        pop_raw = (b["mentions"] * 0.7) + (b["sum_score"] * 0.3)  # weight mentions more than raw votes
+        sent    = sentiment_delta(display)  # -1..1
+        items.append({
+            "title": display,
+            "url": b["urls"][0] if b["urls"] else None,
+            "source": ",".join(sorted(s for s in b["sources"] if s)),
+            "score": pop_raw,   # normalize later
+            "d1": sent          # sign => color, magnitude => saturation
+        })
+
+    # 4) normalize score to 0..1
     items = normalize_score(items, key="score")
+
+    # 5) apply a minimum-threshold filter if you want (mentions >= X)
+    min_mentions = int(request.args.get("min", 1))
+    if min_mentions > 1:
+        # rebuild mentions map for filtering
+        m = {b["best_title"]: b["mentions"] for b in buckets}
+        items = [it for it in items if m.get(it["title"], 1) >= min_mentions]
+
+    # sort by popularity descending so biggest appear first
+    items.sort(key=lambda x: x["score"], reverse=True)
+
     return jsonify({"last_updated": int(time.time()), "items": items})
 
-@app.get("/")
-def root():
-    return jsonify({"ok": True, "endpoints": ["/api/attention/heatmap"]})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
