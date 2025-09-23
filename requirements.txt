@@ -7,3 +7,4 @@ lxml==6.0.2
 pandas==2.3.2
 vaderSentiment==3.3.2
 feedparser==6.0.11
+gunicorn==21.2.0
