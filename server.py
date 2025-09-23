@@ -5,7 +5,7 @@ from pytrends.request import TrendReq
 import praw
 import os
 
-app = Flask(__name__)
+app = Flask(__name__,static_url_path='/static', static_folder='static')
 CORS(app, resources={r"/api/*": {"origins": "*"}})  # allow cross-site fetches
 
 @app.after_request
