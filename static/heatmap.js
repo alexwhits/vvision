@@ -20,11 +20,21 @@
     const alpha = clamp(0.2 + 0.8 * (item.score ?? 0.5));
     return `rgba(${rgb.trim()}, ${alpha.toFixed(2)})`;
   }
-  function cell(item){
-    const d = document.createElement('div');
-    d.className = 'cell';
-    d.style.background = colorFor(item);
-    return d;
+ function bucketSize(score){
+  // score is 0..1 — map to 1, 2, 3 with a bias toward small
+  if (score >= 0.80) return 3;
+  if (score >= 0.45) return 2;
+  return 1;
+  }
+
+ function cell(item){
+  const d = document.createElement('div');
+  d.className = 'cell';
+  d.style.background = colorFor(item);
+  d.classList.add(`size-${bucketSize(item.score ?? 0)}`);
+  d.title = item.title || item.name || '';
+  return d;
+
   }
 
   async function load(){
