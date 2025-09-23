@@ -14,7 +14,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})  # allow cross-site fetches
 def add_cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type" 
+def nocache(resp):
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
     return resp
 
 # ---- helpers -------------------------------------------------
