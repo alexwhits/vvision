@@ -40,7 +40,8 @@
   async function load(){
     try{
       let items = [];
-      const r = await fetch(API, {cache:'no-store', mode:'cors'});
+      const r = await fetch(`${API}?t=${Date.now()}`, { cache: 'no-store', mode: 'cors' });
+
       if (r.ok){
         const j = await r.json();
         if (Array.isArray(j.items)) items = j.items;
