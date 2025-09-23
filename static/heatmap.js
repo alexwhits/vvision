@@ -75,7 +75,7 @@
   async function load(){
     try{
       // cache-bust to force fresh data
-      const r = await fetch(`${API}?t=${Date.now()}`, {cache:'no-store', mode:'cors'});
+      const r = await fetch(`${API}?min=2&t=${Date.now()}`, { cache:'no-store', mode:'cors' });
       let items = [];
       if (r.ok){
         const j = await r.json();
