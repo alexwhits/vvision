@@ -165,7 +165,7 @@ def heatmap():
     # 1) pull raw signals
     trends = fetch_trends(limit=15)
     reddit = fetch_reddit(limit=20)
-    news   = fetch_reuters(limit=20)
+   
 
     # seed X from top terms out of trends+news to avoid noisy reddit phrasing
     seed_terms = [it["title"] for it in (trends + news)][:10]
